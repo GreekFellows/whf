@@ -9,23 +9,32 @@ def enum(*sequential, **named):
 # token tags, correspond to our data types as well
 
 token_tags = enum(
+	# generic stuff
+	"LP", "RP",
+
 	# the 2 only types
 	"INT", "STR",
 
 	# keywords
 	# string manipulation
-	"HAN", "HANG",
+	"H",
 
 	# i/o
 	"NG"
 	)
 
 token_tags_dict = {
+	token_tags.LP: "(",
+	token_tags.RP: ")",
 	token_tags.INT: "int",
 	token_tags.STR: "str",
-	token_tags.HAN: "han",
-	token_tags.HANG: "hang",
+	token_tags.H: "h",
 	token_tags.NG: "ng"
+}
+
+kws_dict = {
+	"h": token_tags.H,
+	"ng": token_tags.NG
 }
 
 # types
@@ -101,16 +110,22 @@ class word_token(token):
 	def __repr__(self):
 		return "word_token(" + token_tags_dict[self.tag] + ", " + repr(self.info) + ")"
 
-# lexer function
+# lexer function and helper functions
+
+def find_kw_token_tag(lexeme):
+	return kws_dict.get(lexeme)
 
 def lex(s):
+	i = 0
 	tokens = []
 
 	whspace_pattern = "( |\t|\n|\r)+"
 	int_lit_pattern = "W[weihangf]*"
+	word_pattern = "[weihangf]+"
 
 	whspace_prog = re.compile(whspace_pattern)
 	int_lit_prog = re.compile(int_lit_pattern)
+	word_prog = re.compile(word_pattern)
 
 	while (len(s) > 0):
 		# ignore whitespaces
@@ -128,15 +143,52 @@ def lex(s):
 
 			tok = int_token(
 				int(int_lit_end - int_lit_start - 1),
-				token_info(
-					int_lit_start,
-					int_lit_end,
-					int_lit_lexeme
-					)
+				token_info(i + int_lit_start, i + int_lit_end, int_lit_lexeme)
 				)
 			tokens.append(tok)
 
 			s = s[int_lit_end:]
+			i += (word_end - word_start)
+			continue
+
+		# keywords
+		word_match = word_prog.match(s)
+		if (word_match):
+			word_start = word_match.start()
+			word_end = word_match.end()
+			word_lexeme = word_match.group(0)
+
+			tok = word_token(
+				find_kw_token_tag(word_lexeme),
+				token_info(i + word_start, i + word_end, word_lexeme)
+				)
+			tokens.append(tok)
+
+			s = s[word_end:]
+			i += (word_end - word_start)
+			continue
+
+		# generics
+		if (s[0] == "("):
+			tok = token(
+				token_tags.LP,
+				token_info(i, i + 1, "(")
+				)
+			tokens.append(tok)
+
+			s = s[1:]
+			i += 1
+			continue
+
+		if (s[0] == ")"):
+			tok = token(
+				token_tags.RP,
+				token_info(i, i + 1, ")")
+				)
+			tokens.append(tok)
+
+			s = s[1:]
+			i += 1
 			continue
 
 		# error
